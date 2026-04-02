@@ -1,0 +1,38 @@
+{
+  "_comment": "Ticker universe for daily IV collection. Edit freely — collector reads this each run.",
+
+  "sp500_core": [
+    "SPY", "QQQ", "IWM", "DIA", "MDY",
+    "AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "TSLA", "AVGO", "BRK-B", "JPM",
+    "V", "UNH", "XOM", "MA", "LLY", "HD", "PG", "JNJ", "COST", "ABBV",
+    "MRK", "CVX", "CRM", "WMT", "BAC", "AMD", "NFLX", "ACN", "MCD", "TMO",
+    "ORCL", "CSCO", "ABT", "GE", "TXN", "ADBE", "MS", "GS", "BLK", "AXP",
+    "IBM", "QCOM", "INTU", "SPGI", "ISRG", "CAT", "PLD", "AMAT", "HON", "BKNG"
+  ],
+
+  "sector_etfs": [
+    "XLK", "XLF", "XLE", "XLV", "XLI", "XLC", "XLY", "XLP", "XLB", "XLRE", "XLU",
+    "SMH", "SOXX", "XBI", "IBB", "GDX", "GDXJ", "XOP", "OIH", "KRE", "XHB",
+    "ARKK", "ARKG", "ARKW"
+  ],
+
+  "vol_products": [
+    "VXX", "UVXY", "SVXY", "VIXY"
+  ],
+
+  "leveraged": [
+    "TQQQ", "SQQQ", "UPRO", "SPXU", "LABU", "LABD", "BOIL", "KOLD", "FNGU", "FNGD"
+  ],
+
+  "macro": [
+    "TLT", "HYG", "LQD", "GLD", "SLV", "USO", "UNG", "FXI", "EEM", "EWZ", "EWJ"
+  ],
+
+  "high_vol_individual": [
+    "MSTR", "COIN", "HOOD", "RBLX", "SNAP", "PLTR", "RIVN", "LCID", "NKTR", "SAVA",
+    "MRNA", "BNTX", "GME", "AMC", "BBBY", "SPCE", "IONQ", "RGTI", "QUBT"
+  ],
+
+  "_active_groups": ["sp500_core", "sector_etfs", "vol_products", "leveraged", "macro"],
+  "_comment_active": "Set which groups to scan. Remove a group name to skip it. high_vol_individual is opt-in."
+}

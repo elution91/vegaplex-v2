@@ -1,0 +1,108 @@
+from __future__ import annotations
+
+import asyncio
+import logging
+import sys
+from contextlib import asynccontextmanager
+from pathlib import Path
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+
+from app.config import get_settings
+from app.core.errors import http_exception_handler
+
+# ── Logging ──────────────────────────────────────────────────────────────────
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s  %(levelname)-8s  %(name)s — %(message)s",
+    datefmt="%H:%M:%S",
+)
+logger = logging.getLogger("vegaplex")
+
+
+# ── Ensure analytics/ is importable ──────────────────────────────────────────
+_analytics_dir = Path(__file__).parent.parent / "analytics"
+if str(_analytics_dir) not in sys.path:
+    sys.path.insert(0, str(_analytics_dir))
+
+
+# ── Lifespan: start/stop scheduler, pre-warm singletons ──────────────────────
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    settings = get_settings()
+    logger.info("νegaPlex v2 starting — data_source=%s", settings.data_source)
+
+    # Pre-warm VIX engine in background (avoid first-request delay)
+    from app.dependencies import _get_vix_engine  # noqa: PLC0415
+    loop = asyncio.get_event_loop()
+    loop.run_in_executor(None, lambda: _get_vix_engine(settings).get_all())
+
+    # Start APScheduler
+    from app.services.scheduler_service import start_scheduler, stop_scheduler  # noqa: PLC0415
+    start_scheduler(settings)
+
+    yield
+
+    stop_scheduler()
+    logger.info("νegaPlex v2 shutdown")
+
+
+# ── App factory ───────────────────────────────────────────────────────────────
+def create_app() -> FastAPI:
+    settings = get_settings()
+
+    app = FastAPI(
+        title="νegaPlex API",
+        version="2.0.0",
+        description="Volatility surface intelligence — FastAPI backend",
+        lifespan=lifespan,
+    )
+
+    # CORS — allow Vite dev server
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    app.add_exception_handler(Exception, http_exception_handler)
+
+    # ── Routers ───────────────────────────────────────────────────────────────
+    from app.routers import (  # noqa: PLC0415
+        broker,
+        earnings,
+        radar,
+        regime,
+        scan,
+        scheduler,
+        surface,
+        vix,
+    )
+
+    app.include_router(scan.router,      prefix="/api/scan",       tags=["scan"])
+    app.include_router(surface.router,   prefix="/api/surface",    tags=["surface"])
+    app.include_router(regime.router,    prefix="/api/regime",     tags=["regime"])
+    app.include_router(radar.router,     prefix="/api/radar",      tags=["radar"])
+    app.include_router(vix.router,       prefix="/api/vix",        tags=["vix"])
+    app.include_router(earnings.router,  prefix="/api/earnings",   tags=["earnings"])
+    app.include_router(broker.router,    prefix="/api/broker",     tags=["broker"])
+    app.include_router(scheduler.router, prefix="/api/scheduler",  tags=["scheduler"])
+
+    # ── Serve built frontend (production) ────────────────────────────────────
+    frontend_dist = Path(__file__).parent.parent.parent / "frontend" / "dist"
+    if frontend_dist.exists():
+        app.mount("/", StaticFiles(directory=str(frontend_dist), html=True), name="static")
+
+    return app
+
+
+app = create_app()
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("app.main:app", host="127.0.0.1", port=8000, reload=True)

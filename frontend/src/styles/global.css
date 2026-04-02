@@ -1,0 +1,98 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html, body, #root {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    background-color: #0d1117;
+    color: #e6edf3;
+    font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+    font-size: 13px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track { background: #0d1117; }
+  ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #484f58; }
+}
+
+@layer components {
+  .nav-tab-btn {
+    @apply px-3 py-1.5 text-xs font-medium rounded text-text-muted border border-transparent
+           transition-colors duration-150 cursor-pointer bg-transparent
+           hover:text-text-primary hover:border-border;
+  }
+  .nav-tab-btn.active {
+    @apply text-accent border-accent bg-accent/10;
+  }
+
+  .card {
+    @apply bg-bg-card border border-border rounded-md;
+  }
+
+  .metric-card {
+    @apply card p-3 flex flex-col gap-1;
+  }
+
+  .metric-value {
+    @apply text-lg font-semibold text-text-primary;
+  }
+
+  .metric-label {
+    @apply text-xs text-text-muted uppercase tracking-wide;
+  }
+
+  /* Table base */
+  .vp-table {
+    @apply w-full text-xs border-collapse;
+  }
+  .vp-table th {
+    @apply px-2 py-1.5 text-left text-text-muted font-medium border-b border-border
+           bg-bg-elevated sticky top-0;
+  }
+  .vp-table td {
+    @apply px-2 py-1.5 border-b border-border/40 text-text-primary;
+  }
+  .vp-table tr:hover td {
+    @apply bg-white/[0.03];
+  }
+  .vp-table tr.selected td {
+    @apply bg-accent/10;
+  }
+
+  /* Confidence tiers */
+  .conf-high   { @apply text-positive; }
+  .conf-medium { @apply text-warning; }
+  .conf-low    { @apply text-text-muted; }
+
+  /* Greek bias */
+  .greek-short   { @apply text-greek-short; }
+  .greek-long    { @apply text-greek-long; }
+  .greek-warn    { @apply text-greek-warn; }
+
+  /* Regime badges */
+  .regime-badge {
+    @apply px-2 py-0.5 rounded-full text-xs font-medium;
+  }
+  .regime-sticky-delta  { @apply regime-badge bg-accent/20 text-accent; }
+  .regime-sticky-strike { @apply regime-badge bg-positive/20 text-positive; }
+  .regime-local-vol     { @apply regime-badge bg-warning/20 text-warning; }
+  .regime-jumpy         { @apply regime-badge bg-negative/20 text-negative; }
+
+  .strategy-banner {
+    @apply px-4 py-2 rounded text-sm font-semibold text-center tracking-wider;
+  }
+  .banner-carry-on  { @apply strategy-banner bg-positive/20 text-positive border border-positive/30; }
+  .banner-carry-off { @apply strategy-banner bg-negative/20 text-negative border border-negative/30; }
+}

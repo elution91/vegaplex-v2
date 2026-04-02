@@ -1,0 +1,50 @@
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# ── Virtual environments ──────────────────────────────────────────────────────
+venv/
+env/
+.venv/
+.env
+backend/.env
+
+# ── Runtime / generated data ─────────────────────────────────────────────────
+backend/analytics/data/
+backend/analytics/earnings_history/
+backend/analytics/output/
+*.db
+*.csv
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+*.log
+
+# ── Personal config (copy config.example.json → config.json and edit) ────────
+backend/analytics/config.json
+
+# ── Frontend build artefacts ─────────────────────────────────────────────────
+frontend/node_modules/
+frontend/dist/
+
+# ── Vendored JS (download manually — see assets/README.md) ───────────────────
+backend/analytics/assets/echarts.min.js
+
+# ── Binaries / media ──────────────────────────────────────────────────────────
+*.pdf
+*.png
+*.jpg
+
+# ── IDE / OS ──────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.claude/
