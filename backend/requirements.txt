@@ -17,6 +17,7 @@ lxml>=4.9
 pytz>=2023.3
 tqdm>=4.66
 plotly>=5.18
+matplotlib>=3.7
 
 # Massive flat files (S3-compatible)
 boto3>=1.34
