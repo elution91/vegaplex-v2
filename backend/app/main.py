@@ -47,10 +47,10 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # CORS — allow Vite dev server
+    # CORS — allow Vite dev server + production frontend
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.cors_origins,
+        allow_origins=settings.cors_origins_list(),
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

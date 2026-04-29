@@ -30,10 +30,15 @@ class Settings(BaseSettings):
     # Polygon
     polygon_api_key: str = ""
 
-    # CORS origins allowed (comma-separated in env, list here)
-    cors_origins: list[str] = Field(
-        default=["http://localhost:5173", "http://127.0.0.1:5173"]
+    # CORS origins — comma-separated in env (env: VEGAPLEX_CORS_ORIGINS)
+    # Stored as a string so pydantic-settings doesn't JSON-parse it.
+    # Use the `cors_origins` property to get a list.
+    cors_origins: str = Field(
+        default="http://localhost:5173,http://127.0.0.1:5173",
     )
+
+    def cors_origins_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
     # Shared-password gate for beta access. Empty string disables auth (local dev).
     # Set VEGAPLEX_AUTH_PASSWORD in production to require it.
