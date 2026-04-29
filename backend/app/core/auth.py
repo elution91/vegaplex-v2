@@ -31,6 +31,11 @@ class SharedPasswordMiddleware(BaseHTTPMiddleware):
         self.password = password
 
     async def dispatch(self, request: Request, call_next):
+        # CORS preflight requests must pass through untouched so CORSMiddleware
+        # can attach headers. Browsers send OPTIONS with no auth header.
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
         # No password configured → auth disabled (local dev)
         if not self.password:
             return await call_next(request)
