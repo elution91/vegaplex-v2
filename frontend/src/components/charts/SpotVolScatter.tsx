@@ -35,7 +35,7 @@ function ols(xs: number[], ys: number[]): { slope: number; intercept: number; r2
   return { slope, intercept, r2: corr < 0 ? -Math.sqrt(r2) : Math.sqrt(r2) } // return signed R for display
 }
 
-export default function SpotVolScatter({ returns, vol, dates, symbol = '', height = 260 }: Props) {
+export default function SpotVolScatter({ returns, vol, dates, height = 260 }: Props) {
   const ref = useRef<HTMLDivElement>(null)
   const chartRef = useRef<echarts.ECharts | null>(null)
   const [excluded, setExcluded] = useState<Set<number>>(new Set())
@@ -158,7 +158,8 @@ export default function SpotVolScatter({ returns, vol, dates, symbol = '', heigh
     chartRef.current.setOption(buildOption(), true)
 
     const chart = chartRef.current
-    const handler = (params: { seriesIndex?: number; dataIndex?: number; data?: { value?: number[] } }) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const handler = (params: any) => {
       // Only respond to clicks on the two scatter series (index 0 = active, 1 = excluded)
       if (params.seriesIndex === 2) return // regression line
       const pt = params.data as { value?: number[] } | undefined

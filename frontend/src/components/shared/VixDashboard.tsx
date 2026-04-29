@@ -146,7 +146,7 @@ function basisDesc(ratio: number | undefined): string {
   return 'Backwardation'
 }
 
-function carryQuality(carry: number | undefined, pct: number | undefined): string {
+function carryQuality(carry: number | undefined, _pct: number | undefined): string {
   if (carry == null) return '—'
   if (carry < 0.85) return 'INSUFFICIENT'
   if (carry < 0.92) return 'Borderline'
@@ -168,7 +168,6 @@ const STATE_OFF: React.CSSProperties = {
 
 export default function VixDashboard({ metrics: m, percentiles: p, outcomes }: Props) {
   const carryOn   = m.carry_on ?? false
-  const alloc     = m.allocation ?? 0
   const basis     = basisDesc(m.vix_ratio)
   const rvPct     = (m.realized_vol ?? 0) * 100
   const vrp       = m.vrp ?? 0

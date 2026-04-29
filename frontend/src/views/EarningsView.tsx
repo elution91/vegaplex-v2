@@ -41,11 +41,6 @@ function fmt(v: unknown, decimals = 2): string {
   return isNaN(n) ? String(v) : n.toFixed(decimals)
 }
 
-function pct(v: unknown): string {
-  const n = Number(v)
-  return isNaN(n) ? '—' : (n * 100).toFixed(0) + '%'
-}
-
 // ── Column definitions ──────────────────────────────────────────────────────
 
 const COLUMNS = [
@@ -236,11 +231,6 @@ function MacroEventTable() {
 // ── Main view ───────────────────────────────────────────────────────────────
 
 type EventsTab = 'earnings' | 'macro'
-
-const EVENTS_TABS: { id: EventsTab; label: string }[] = [
-  { id: 'earnings', label: 'Earnings' },
-  { id: 'macro',    label: 'Macro Event Vol' },
-]
 
 export default function EarningsView() {
   const location = useLocation()

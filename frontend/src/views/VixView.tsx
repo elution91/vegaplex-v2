@@ -47,12 +47,6 @@ type VixData = {
 
 type SubTab = 'status' | 'history' | 'analytics'
 
-const SUB_TABS: { id: SubTab; label: string }[] = [
-  { id: 'status',    label: 'Status' },
-  { id: 'history',   label: 'Time Series' },
-  { id: 'analytics', label: 'Analytics' },
-]
-
 function fmt(v: number | null | undefined, decimals = 2): string {
   if (v == null) return '—'
   return v.toFixed(decimals)
