@@ -47,12 +47,13 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # CORS — allow Vite dev server + production frontend
+    # CORS — allow listed origins + any *.vercel.app preview URL via regex
     cors_list = settings.cors_origins_list()
     logger.info(f"CORS allow_origins = {cors_list}")
     app.add_middleware(
         CORSMiddleware,
         allow_origins=cors_list,
+        allow_origin_regex=r"https://.*\.vercel\.app",
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
