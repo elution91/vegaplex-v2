@@ -1,0 +1,29 @@
+# Render blueprint — deploys the FastAPI backend.
+# Apply via "New + → Blueprint" in the Render dashboard, pointed at this repo.
+#
+# Required dashboard secrets (do NOT commit):
+#   VEGAPLEX_AUTH_PASSWORD   — shared password for beta access
+#   VEGAPLEX_CORS_ORIGINS    — comma-separated, e.g. "https://vegaplex.vercel.app"
+services:
+  - type: web
+    name: vegaplex-api
+    runtime: docker
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    plan: starter            # $7/mo — avoids cold starts
+    region: oregon           # change if beta users are EU
+    healthCheckPath: /api/auth/status
+    disk:
+      name: vegaplex-data
+      mountPath: /app/data
+      sizeGB: 1              # holds skew_history.db (~90 MB) + room to grow
+    envVars:
+      - key: PORT
+        value: 8000
+      - key: VEGAPLEX_DATA_DIR
+        value: /app/data
+      - key: VEGAPLEX_AUTH_PASSWORD
+        sync: false          # set in dashboard
+      - key: VEGAPLEX_CORS_ORIGINS
+        sync: false          # set in dashboard
+    autoDeploy: true

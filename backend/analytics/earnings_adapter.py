@@ -483,6 +483,7 @@ class EarningsAdapter:
         tradier_key: Optional[str] = None,
         ibkr_host: Optional[str] = None,
         ibkr_port: Optional[int] = None,
+        days_ahead: int = 1,
     ) -> Dict:
         """Run earnings scan and return structured results for the dashboard store.
 
@@ -492,11 +493,22 @@ class EarningsAdapter:
         term_slope_threshold: hard gate for term structure slope.
             -0.004 = backwardation required (iron fly strategy, default)
              0.010 = flat/any allowed (short straddle strategy)
+        days_ahead: how many calendar days forward to look for earnings.
+            Raises the DTE gate from 9 to (days_ahead + 9) so forward scans
+            can find candidates whose nearest option expiry is further out.
         tradier_key: optional Tradier API key; when set, all options data
             comes from Tradier (real-time bid/ask, IV, greeks).
         """
         # Apply term structure threshold before scan
         self.scanner.term_slope_threshold = term_slope_threshold
+        # Raise the DTE gate proportionally so forward scans are not blocked
+        self.scanner.max_dte = 9 + max(0, days_ahead - 1)
+
+        # If scanning forward and no explicit date provided, target the end of the window
+        if input_date is None and days_ahead > 1:
+            from datetime import timedelta as _td
+            target = datetime.today().date() + _td(days=days_ahead - 1)
+            input_date = target.strftime('%m/%d/%Y')
 
         # Set up live data fetcher if broker credentials provided
         tradier = None

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 import sys
 from contextlib import asynccontextmanager
@@ -11,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
+from app.core.auth import SharedPasswordMiddleware
 from app.core.errors import http_exception_handler
 
 # ── Logging ──────────────────────────────────────────────────────────────────
@@ -31,21 +31,8 @@ if str(_analytics_dir) not in sys.path:
 # ── Lifespan: start/stop scheduler, pre-warm singletons ──────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    settings = get_settings()
-    logger.info("νegaPlex v2 starting — data_source=%s", settings.data_source)
-
-    # Pre-warm VIX engine in background (avoid first-request delay)
-    from app.dependencies import _get_vix_engine  # noqa: PLC0415
-    loop = asyncio.get_event_loop()
-    loop.run_in_executor(None, lambda: _get_vix_engine(settings).get_all())
-
-    # Start APScheduler
-    from app.services.scheduler_service import start_scheduler, stop_scheduler  # noqa: PLC0415
-    start_scheduler(settings)
-
+    logger.info("νegaPlex v2 starting")
     yield
-
-    stop_scheduler()
     logger.info("νegaPlex v2 shutdown")
 
 
@@ -69,12 +56,17 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    # Shared-password gate (no-op when VEGAPLEX_AUTH_PASSWORD is empty)
+    app.add_middleware(SharedPasswordMiddleware, password=settings.auth_password)
+
     app.add_exception_handler(Exception, http_exception_handler)
 
     # ── Routers ───────────────────────────────────────────────────────────────
     from app.routers import (  # noqa: PLC0415
+        auth,
         broker,
         earnings,
+        macro_events,
         radar,
         regime,
         scan,
@@ -83,6 +75,7 @@ def create_app() -> FastAPI:
         vix,
     )
 
+    app.include_router(auth.router,      prefix="/api/auth",       tags=["auth"])
     app.include_router(scan.router,      prefix="/api/scan",       tags=["scan"])
     app.include_router(surface.router,   prefix="/api/surface",    tags=["surface"])
     app.include_router(regime.router,    prefix="/api/regime",     tags=["regime"])
@@ -91,6 +84,7 @@ def create_app() -> FastAPI:
     app.include_router(earnings.router,  prefix="/api/earnings",   tags=["earnings"])
     app.include_router(broker.router,    prefix="/api/broker",     tags=["broker"])
     app.include_router(scheduler.router, prefix="/api/scheduler",  tags=["scheduler"])
+    app.include_router(macro_events.router, prefix="/api/macro-events", tags=["macro-events"])
 
     # ── Serve built frontend (production) ────────────────────────────────────
     frontend_dist = Path(__file__).parent.parent.parent / "frontend" / "dist"

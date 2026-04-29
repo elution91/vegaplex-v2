@@ -6,6 +6,7 @@ export function useVix() {
     queryKey: ['vix'],
     queryFn: getVix,
     staleTime: 5 * 60_000,
-    refetchOnWindowFocus: false,
+    refetchInterval: 5 * 60_000,
+    retry: 1,
   })
 }

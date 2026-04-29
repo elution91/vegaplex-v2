@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 168 50" height="36" width="168">
+  <defs>
+    <!-- Gradient for the V character: purple → teal -->
+    <linearGradient id="vg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#BD5DFF"/>
+      <stop offset="100%" stop-color="#2DD4BF"/>
+    </linearGradient>
+    <!-- Gradient for axes: purple → teal -->
+    <linearGradient id="ax" gradientUnits="userSpaceOnUse"
+                    x1="13" y1="2" x2="158" y2="44">
+      <stop offset="0%"   stop-color="#BD5DFF"/>
+      <stop offset="100%" stop-color="#2DD4BF"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Vertical axis -->
+  <line x1="13" y1="38" x2="13" y2="9"
+        stroke="url(#ax)" stroke-width="2.2" stroke-linecap="round"/>
+  <!-- Up arrowhead -->
+  <polygon points="13,2  9.5,11  16.5,11" fill="url(#ax)"/>
+
+  <!-- L-shape base: rounded corner then horizontal — ends after "x" in VegaPlex -->
+  <path d="M 13,34 Q 13,42 21,42 L 154,42"
+        stroke="url(#ax)" stroke-width="2.8" fill="none" stroke-linecap="round"/>
+  <!-- Right arrowhead — tip at 162, base at 154 -->
+  <polygon points="162,42  154,38.5  154,45.5" fill="url(#ax)"/>
+
+  <!-- Wordmark: bold "V" in gradient, "egaPlex" in light -->
+  <!-- ν (nu) in italic serif for mathematical character, then sans for the rest -->
+  <text x="20" y="38"
+        font-family="Georgia,'Times New Roman',serif"
+        font-size="37"
+        fill="url(#vg)"
+        font-style="italic"
+        font-weight="400">ν</text>
+  <text x="39" y="38"
+        font-family="'Century Gothic','Trebuchet MS',Arial,sans-serif"
+        font-size="30"
+        fill="#eeeeee"
+        font-weight="400">egaplex</text>
+</svg>

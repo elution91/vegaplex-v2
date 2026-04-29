@@ -307,14 +307,22 @@ class RegimeClassifier:
         return result
 
     def classify_universe(self, symbols: List[str]) -> Dict[str, Dict]:
-        """Classify regimes for a list of symbols."""
-        results = {}
-        for sym in symbols:
+        """Classify regimes for a list of symbols in parallel."""
+        from concurrent.futures import ThreadPoolExecutor, as_completed  # noqa: PLC0415
+        results: Dict[str, Dict] = {}
+
+        def _classify_one(sym: str) -> tuple:
             try:
-                results[sym] = self.classify(sym)
+                return sym, self.classify(sym)
             except Exception as e:
                 logger.warning(f"Regime classification failed for {sym}: {e}")
-                results[sym] = self._empty_result(sym)
+                return sym, self._empty_result(sym)
+
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            futs = {pool.submit(_classify_one, s): s for s in symbols}
+            for fut in as_completed(futs):
+                sym, res = fut.result()
+                results[sym] = res
         return results
 
     def get_cached(self, symbol: str) -> Optional[Dict]:
@@ -461,7 +469,7 @@ class RegimeClassifier:
             return None
 
     def _fetch_history(self, symbol: str) -> Optional[pd.DataFrame]:
-        """Fetch historical price data via yfinance."""
+        """Fetch historical price data via yfinance, patching today's price via fast_info."""
         if yf is None:
             logger.warning("yfinance not available for regime classification")
             return None
@@ -471,6 +479,27 @@ class RegimeClassifier:
             data = ticker.history(period=period)
             if data is None or data.empty:
                 return None
+
+            # Patch today's close with intraday price to avoid 1-2 day yfinance lag
+            try:
+                fi = ticker.fast_info
+                live_price = fi.get('lastPrice') or fi.get('regularMarketPrice')
+                if live_price and float(live_price) > 0:
+                    today = pd.Timestamp(datetime.today().date())
+                    last_date = data.index[-1].normalize() if not data.empty else None
+                    new_row = data.iloc[-1].copy()
+                    new_row['Close'] = float(live_price)
+                    new_row['Open'] = float(live_price)
+                    new_row['High'] = float(live_price)
+                    new_row['Low'] = float(live_price)
+                    if last_date is None or today > last_date:
+                        new_row.name = today
+                        data = pd.concat([data, new_row.to_frame().T])
+                    else:
+                        data.iloc[-1, data.columns.get_loc('Close')] = float(live_price)
+            except Exception:
+                pass  # fast_info failure is non-fatal
+
             return data
         except Exception as e:
             logger.warning(f"Failed to fetch history for {symbol}: {e}")

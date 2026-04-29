@@ -4,7 +4,7 @@ import asyncio
 import logging
 from typing import Any
 
-from app.services.chart_service import get_vix_charts
+from app.services.chart_service import get_vix_charts, get_vix_chart_stats
 
 logger = logging.getLogger("vegaplex.vix")
 
@@ -16,4 +16,8 @@ async def get_vix_data(vix_engine: Any, regime_result: dict | None = None) -> di
         return {"error": "VIX data unavailable"}
 
     charts = get_vix_charts(raw)
-    return {**raw, "charts": charts}
+    chart_stats = get_vix_chart_stats(raw)
+
+    # pandas DataFrame is not JSON-serialisable — exclude it from the response
+    safe = {k: v for k, v in raw.items() if k not in ("history",)}
+    return {**safe, "charts": charts, "chart_stats": chart_stats}

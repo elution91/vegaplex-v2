@@ -1,0 +1,22 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.venv/
+venv/
+.env
+.env.*
+
+# DB is too large for git (~100MB) — seed directly on Render via shell instead
+analytics/skew_history.db
+analytics/output/
+analytics/data/
+analytics/earnings_history/
+
+# Misc
+.git/
+.gitignore
+*.log
+*.md

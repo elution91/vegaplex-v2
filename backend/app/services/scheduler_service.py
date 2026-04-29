@@ -1,21 +1,19 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from app.config import Settings
 
 logger = logging.getLogger("vegaplex.scheduler")
 
 _scheduler = None
 
 
-def start_scheduler(settings: "Settings") -> None:
+def start_scheduler() -> None:
     global _scheduler
+    from app.config import get_settings  # noqa: PLC0415
     from apscheduler.schedulers.background import BackgroundScheduler  # noqa: PLC0415
     from apscheduler.triggers.cron import CronTrigger  # noqa: PLC0415
 
+    settings = get_settings()
     _scheduler = BackgroundScheduler(timezone=settings.scheduler_timezone)
 
     # Daily Polygon seeder job

@@ -13,7 +13,7 @@ export default function ProgressStream({ done, total, currentTicker, errors = []
 
   return (
     <div className="card p-3 mb-3 space-y-2">
-      <div className="flex items-center justify-between text-xs text-text-muted">
+      <div className="flex items-center justify-between text-text-muted" style={{ fontSize: 13 }}>
         <span>
           Scanning{currentTicker ? ` — ${currentTicker}` : ''}
         </span>
@@ -26,7 +26,7 @@ export default function ProgressStream({ done, total, currentTicker, errors = []
         />
       </div>
       {errors.length > 0 && (
-        <div className="text-xs text-warning space-y-0.5">
+        <div className="text-warning space-y-0.5" style={{ fontSize: 13 }}>
           {errors.slice(-3).map((e, i) => (
             <div key={i}>{e.ticker ? `[${e.ticker}] ` : ''}{e.message}</div>
           ))}

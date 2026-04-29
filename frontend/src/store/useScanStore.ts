@@ -72,8 +72,11 @@ export const useScanStore = create<ScanState>((set) => ({
   addError: (ticker, message) =>
     set((s) => ({ errors: [...s.errors, { ticker, message }] })),
 
-  setComplete: (_results, _status) =>
-    set({ status: 'complete', progress: (s => s.progress)(useScanStore.getState()) }),
+  setComplete: (results, _status) =>
+    set((s) => ({
+      status: 'complete',
+      results: results.length > 0 ? results : s.results,
+    })),
 
   setIdle: () =>
     set({ status: 'idle', progress: { done: 0, total: 0, currentTicker: '' } }),

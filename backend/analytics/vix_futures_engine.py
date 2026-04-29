@@ -94,8 +94,13 @@ class VIXFuturesEngine:
           error         — None or error message string
         """
         now = datetime.now()
-        if (self._cache and self._cache_ts and
-                (now - self._cache_ts).total_seconds() < self._cache_ttl_minutes * 60):
+        # Shorter TTL during market hours (9:30–16:00 ET Mon–Fri); invalidate if cache is from a previous calendar date
+        _et_hour = (now.hour - 5) % 24  # rough ET offset (no DST correction needed for this purpose)
+        _market_hours = (now.weekday() < 5) and (9 <= _et_hour < 16)
+        _ttl = 5 if _market_hours else self._cache_ttl_minutes
+        _cache_date_ok = self._cache_ts and self._cache_ts.date() == now.date()
+        if (self._cache and self._cache_ts and _cache_date_ok and
+                (now - self._cache_ts).total_seconds() < _ttl * 60):
             result = dict(self._cache)
             # Always regenerate synthesis in case regime_result changed
             if regime_result is not None:
@@ -115,7 +120,8 @@ class VIXFuturesEngine:
             metrics = self._scalar_metrics(df)
             percentiles = self._compute_percentiles(df)
             outcomes = self._compute_outcomes(df)
-            futures_strip = self._fetch_futures_strip()
+            transitions = self._compute_transitions(df)
+            futures_strip, strip_source = self._fetch_futures_strip()
 
             # Store today's strip and run PCA (no-op if sklearn missing or strip empty)
             pca_signal = {}
@@ -131,7 +137,9 @@ class VIXFuturesEngine:
                 'history': df,
                 'percentiles': percentiles,
                 'outcomes': outcomes,
+                'transitions': transitions,
                 'futures_strip': futures_strip,
+                'futures_strip_source': strip_source,
                 'pca': pca_signal,
                 'synthesis': synthesis,
                 'error': None,
@@ -143,6 +151,48 @@ class VIXFuturesEngine:
         except Exception as e:
             logger.exception("VIXFuturesEngine.get_all failed")
             return self._error_result(str(e))
+
+    def get_snapshot(self, date_str: str) -> dict:
+        """
+        Return metrics and percentiles as-of a specific historical date.
+        Uses the full history up to and including that date so percentiles
+        reflect the information available on that day (no look-ahead).
+
+        date_str: 'YYYY-MM-DD'
+        """
+        try:
+            snap_date = pd.Timestamp(date_str)
+        except Exception:
+            return self._error_result(f"Invalid date: {date_str}")
+
+        # Ensure full history is loaded (reuse cache if available)
+        full = self.get_all()
+        if full.get("error"):
+            return full
+
+        df: pd.DataFrame = full["history"]
+        df_to_date = df[df.index <= snap_date]
+
+        if df_to_date.empty:
+            return self._error_result(f"No data available on or before {date_str}")
+
+        actual_date = df_to_date.index[-1].strftime("%Y-%m-%d")
+        metrics     = self._scalar_metrics(df_to_date)
+        percentiles = self._compute_percentiles(df_to_date)
+        outcomes    = self._compute_outcomes(df_to_date)
+
+        return {
+            "snapshot_date": actual_date,
+            "requested_date": date_str,
+            "metrics":     metrics,
+            "percentiles": percentiles,
+            "outcomes":    outcomes,
+            "futures_strip": [],          # historical strip not stored
+            "futures_strip_source": "snapshot",
+            "pca":         {},
+            "synthesis":   self._build_synthesis(metrics, percentiles, outcomes, None, {}),
+            "error":       None,
+        }
 
     # ------------------------------------------------------------------
     # Data fetching
@@ -160,31 +210,58 @@ class VIXFuturesEngine:
                               auto_adjust=True, progress=False)
             closes = raw['Close'] if isinstance(raw.columns, pd.MultiIndex) else raw
             closes.columns = [c.replace('^', '') for c in closes.columns]
-            # Keep full VIX/VIX3M history for percentile calibration.
-            # VIX3M available from ~2007; SVXY only from 2011 (pre-2018 data is
-            # post-split adjusted and unreliable for return calcs — NaN is fine here).
             closes = closes.dropna(subset=['VIX', 'VIX3M'])
             closes = closes.tail(lookback_days)
+
+            # Append today's intraday prices if history lags behind
+            try:
+                today = pd.Timestamp(datetime.today().date())
+                last_date = closes.index[-1].normalize() if not closes.empty else None
+                intraday: dict = {}
+                for sym, col in [('^VIX', 'VIX'), ('^VIX3M', 'VIX3M'), ('^VVIX', 'VVIX')]:
+                    fi = yf.Ticker(sym).fast_info
+                    price = fi.get('lastPrice') or fi.get('regularMarketPrice')
+                    if price and price > 0:
+                        intraday[col] = float(price)
+
+                if intraday.get('VIX') and intraday.get('VIX3M'):
+                    if last_date is None or today > last_date:
+                        # History is behind — append a new row for today
+                        new_row = closes.iloc[-1].copy()
+                        for col, val in intraday.items():
+                            if col in new_row.index:
+                                new_row[col] = val
+                        new_row.name = today
+                        closes = pd.concat([closes, new_row.to_frame().T])
+                        logger.info(f"Appended today's intraday row: VIX={intraday.get('VIX'):.2f}")
+                    else:
+                        # History is current — just patch the last row
+                        for col, val in intraday.items():
+                            if col in closes.columns:
+                                closes.iloc[-1, closes.columns.get_loc(col)] = val
+                        logger.info(f"Patched last row with intraday: VIX={intraday.get('VIX'):.2f}")
+            except Exception as e:
+                logger.debug(f"Intraday patch skipped: {e}")
+
             return closes
         except Exception as e:
             logger.warning(f"VIX history fetch failed: {e}")
             return None
 
-    def _fetch_futures_strip(self) -> list:
+    def _fetch_futures_strip(self) -> tuple[list, str]:
         """Fetch VIX futures strip. Priority: IBKR (live) → vixcentral (delayed) → [].
 
-        IBKR is tried first when TWS/Gateway is running locally.
-        Falls back to vixcentral scrape (~15-min delayed, same source as vixcentral.com).
+        Returns (strip, source_label).
         """
         # 1. Try IBKR live feed
         strip = self._fetch_strip_ibkr()
         if strip:
             logger.info("VX strip source: IBKR (live)")
-            return strip
+            return strip, "live"
 
-        # 2. Fall back to vixcentral scrape
-        logger.info("VX strip source: vixcentral (delayed)")
-        return self._fetch_strip_vixcentral()
+        # 2. Fall back to vixcentral scrape (prev settlement only)
+        logger.info("VX strip source: vixcentral (prev settlement)")
+        return self._fetch_strip_vixcentral(), "prev_settlement"
 
     def _fetch_strip_ibkr(self) -> list:
         """Attempt to get VX strip from IBKR. Returns [] silently if unavailable."""
@@ -442,6 +519,68 @@ class VIXFuturesEngine:
                 'spike_pct': round(float(subset['vix_spike_30d'].mean() * 100), 1),
             }
         return outcomes
+
+    def _compute_transitions(self, df: pd.DataFrame) -> dict:
+        """
+        Build a carry-ratio regime transition matrix.
+
+        For each carry bucket (row = current state), compute the probability
+        of being in each bucket 21 trading days later (col = next state).
+
+        Returns:
+            {
+              'buckets': [...bucket labels...],
+              'current_bucket': str,        -- which bucket today falls in
+              'matrix': {from_label: {to_label: pct, ...}, ...},
+              'n_obs':  {from_label: int, ...}
+            }
+        """
+        if 'carry_ratio' not in df.columns:
+            return {}
+
+        bucket_labels = [b[2] for b in CARRY_BUCKETS]
+
+        def _bucket(val):
+            for lo, hi, label in CARRY_BUCKETS:
+                if (lo is None or val >= lo) and (hi is None or val < hi):
+                    return label
+            return bucket_labels[-1]
+
+        series = df['carry_ratio'].dropna()
+        if len(series) < 30:
+            return {}
+
+        current_val   = float(series.iloc[-1])
+        current_bucket = _bucket(current_val)
+
+        # Assign bucket at t and t+21
+        buckets_now  = series.apply(_bucket)
+        buckets_fwd  = series.shift(-21).dropna().apply(_bucket)
+        common_idx   = buckets_now.index.intersection(buckets_fwd.index)
+        buckets_now  = buckets_now.loc[common_idx]
+        buckets_fwd  = buckets_fwd.loc[common_idx]
+
+        matrix = {}
+        n_obs  = {}
+        for from_label in bucket_labels:
+            mask = buckets_now == from_label
+            n = int(mask.sum())
+            n_obs[from_label] = n
+            if n == 0:
+                matrix[from_label] = {to: 0.0 for to in bucket_labels}
+                continue
+            counts = buckets_fwd.loc[mask].value_counts()
+            matrix[from_label] = {
+                to: round(float(counts.get(to, 0)) / n * 100, 1)
+                for to in bucket_labels
+            }
+
+        return {
+            'buckets':        bucket_labels,
+            'current_bucket': current_bucket,
+            'matrix':         matrix,
+            'n_obs':          n_obs,
+        }
 
     # ------------------------------------------------------------------
     # Synthesis text

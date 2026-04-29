@@ -16,6 +16,9 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    def __hash__(self) -> int:  # needed for FastAPI Depends cache
+        return id(self)
+
     # Data source
     data_source: Literal["yfinance", "ibkr"] = "yfinance"
 
@@ -31,6 +34,10 @@ class Settings(BaseSettings):
     cors_origins: list[str] = Field(
         default=["http://localhost:5173", "http://127.0.0.1:5173"]
     )
+
+    # Shared-password gate for beta access. Empty string disables auth (local dev).
+    # Set VEGAPLEX_AUTH_PASSWORD in production to require it.
+    auth_password: str = ""
 
     # Analytics path (resolved relative to this file at runtime)
     analytics_dir: Path = Path(__file__).parent.parent / "analytics"
@@ -63,3 +70,4 @@ def get_settings() -> Settings:
     if _settings is None:
         _settings = Settings.from_config_json()
     return _settings
+

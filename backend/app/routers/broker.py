@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Query
 
 from app.dependencies import get_scanner
 from app.models.requests import BrokerTestRequest
@@ -16,12 +15,9 @@ router = APIRouter()
 async def test_broker(body: BrokerTestRequest) -> BrokerTestResult:
     if body.broker == "yfinance":
         return BrokerTestResult(connected=True, message="yfinance requires no connection")
-
     try:
         from ibkr_fetcher import IBKRFetcher  # noqa: PLC0415
-        fetcher = IBKRFetcher(
-            host=body.host, port=body.port, client_id=body.client_id
-        )
+        fetcher = IBKRFetcher(host=body.host, port=body.port, client_id=body.client_id)
         ok = await asyncio.to_thread(fetcher.test_connection)
         return BrokerTestResult(
             connected=bool(ok),
@@ -35,15 +31,10 @@ async def test_broker(body: BrokerTestRequest) -> BrokerTestResult:
 async def get_options_chain(
     symbol: str,
     expiry: str = Query(default=""),
-    scanner: Annotated[Any, Depends(get_scanner)],
 ) -> dict:
-    """
-    Expose raw IBKR options chain for a symbol.
-    Used to debug BNTT Δ / RICH / REC population issues.
-    """
     try:
         from ibkr_fetcher import IBKRFetcher  # noqa: PLC0415
-        fetcher: IBKRFetcher = scanner.ibkr_fetcher
+        fetcher: IBKRFetcher = get_scanner().ibkr_fetcher
         chain = await asyncio.to_thread(
             fetcher.get_options_for_bennett, symbol.upper(), expiry=expiry or None
         )

@@ -14,7 +14,7 @@ export default function MetricCard({ label, value, sub, valueClass }: Props) {
       <div className={clsx('metric-value', valueClass)}>
         {value ?? '—'}
       </div>
-      {sub && <div className="text-xs text-text-muted">{sub}</div>}
+      {sub && <div className="caption">{sub}</div>}
     </div>
   )
 }

@@ -3,9 +3,7 @@
 @tailwind utilities;
 
 @layer base {
-  * {
-    box-sizing: border-box;
-  }
+  * { box-sizing: border-box; }
 
   html, body, #root {
     height: 100%;
@@ -13,86 +11,178 @@
     padding: 0;
     background-color: #0d1117;
     color: #e6edf3;
-    font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
     font-size: 13px;
+    line-height: 1.5;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
-  ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-  ::-webkit-scrollbar-track { background: #0d1117; }
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
   ::-webkit-scrollbar-thumb:hover { background: #484f58; }
 }
 
 @layer components {
-  .nav-tab-btn {
-    @apply px-3 py-1.5 text-xs font-medium rounded text-text-muted border border-transparent
-           transition-colors duration-150 cursor-pointer bg-transparent
-           hover:text-text-primary hover:border-border;
-  }
-  .nav-tab-btn.active {
-    @apply text-accent border-accent bg-accent/10;
-  }
 
+  /* ── Navigation tabs ─────────────────────────────────────────────── */
+  .nav-tab-btn {
+    padding: 5px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    border-radius: 5px;
+    color: #8b949e;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: color 0.12s, background 0.12s;
+    white-space: nowrap;
+  }
+  .nav-tab-btn:hover  { color: #e6edf3; background: rgba(255,255,255,0.05); }
+  .nav-tab-btn.active { color: #e6edf3; background: rgba(255,255,255,0.08); }
+
+  /* ── Cards ───────────────────────────────────────────────────────── */
   .card {
-    @apply bg-bg-card border border-border rounded-md;
+    background: #161b22;
+    border: 1px solid #21262d;
+    border-radius: 6px;
   }
 
   .metric-card {
-    @apply card p-3 flex flex-col gap-1;
+    @apply card;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
   }
 
-  .metric-value {
-    @apply text-lg font-semibold text-text-primary;
-  }
-
+  /* Metric label: small caps */
   .metric-label {
-    @apply text-xs text-text-muted uppercase tracking-wide;
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #6e7681;
   }
 
-  /* Table base */
+  /* Metric value: mono, larger */
+  .metric-value {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 1.2;
+    color: #e6edf3;
+  }
+
+  /* ── Tables ──────────────────────────────────────────────────────── */
   .vp-table {
-    @apply w-full text-xs border-collapse;
+    width: 100%;
+    border-collapse: collapse;
   }
   .vp-table th {
-    @apply px-2 py-1.5 text-left text-text-muted font-medium border-b border-border
-           bg-bg-elevated sticky top-0;
+    padding: 7px 12px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #6e7681;
+    background: #161b22;
+    border-bottom: 1px solid #21262d;
+    position: sticky;
+    top: 0;
+    white-space: nowrap;
+    z-index: 1;
   }
   .vp-table td {
-    @apply px-2 py-1.5 border-b border-border/40 text-text-primary;
+    padding: 7px 12px;
+    font-size: 13px;
+    color: #e6edf3;
+    border-bottom: 1px solid #1c2128;
   }
-  .vp-table tr:hover td {
-    @apply bg-white/[0.03];
-  }
-  .vp-table tr.selected td {
-    @apply bg-accent/10;
+  .vp-table tr:last-child td { border-bottom: none; }
+  .vp-table tr:hover td { background: rgba(255,255,255,0.02); }
+  .vp-table tr.selected td { background: rgba(88,166,255,0.06); }
+
+  /* Tabular mono for numbers in tables */
+  .mono-cell {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
   }
 
-  /* Confidence tiers */
-  .conf-high   { @apply text-positive; }
-  .conf-medium { @apply text-warning; }
-  .conf-low    { @apply text-text-muted; }
-
-  /* Greek bias */
-  .greek-short   { @apply text-greek-short; }
-  .greek-long    { @apply text-greek-long; }
-  .greek-warn    { @apply text-greek-warn; }
-
-  /* Regime badges */
-  .regime-badge {
-    @apply px-2 py-0.5 rounded-full text-xs font-medium;
+  /* ── Section titles ──────────────────────────────────────────────── */
+  .section-title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: #6e7681;
   }
-  .regime-sticky-delta  { @apply regime-badge bg-accent/20 text-accent; }
-  .regime-sticky-strike { @apply regime-badge bg-positive/20 text-positive; }
-  .regime-local-vol     { @apply regime-badge bg-warning/20 text-warning; }
-  .regime-jumpy         { @apply regime-badge bg-negative/20 text-negative; }
 
+  /* ── Captions ────────────────────────────────────────────────────── */
+  .caption {
+    font-size: 11px;
+    color: #6e7681;
+    line-height: 1.4;
+  }
+
+  /* ── Status pills (table cells, regime labels) ───────────────────── */
+  .pill {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+  }
+  .pill-green  { background: rgba(63,185,80,0.15);  color: #3fb950; }
+  .pill-teal   { background: rgba(45,212,191,0.12); color: #2DD4BF; }
+  .pill-yellow { background: rgba(250,204,21,0.12); color: #e3b341; }
+  .pill-red    { background: rgba(248,81,73,0.15);  color: #f85149; }
+  .pill-blue   { background: rgba(88,166,255,0.12); color: #58a6ff; }
+  .pill-muted  { background: rgba(139,148,158,0.10); color: #8b949e; }
+
+  /* ── Skeleton ────────────────────────────────────────────────────── */
+  .skeleton {
+    background: linear-gradient(90deg, #161b22 25%, #1c2128 50%, #161b22 75%);
+    background-size: 200% 100%;
+    animation: sk 1.6s ease-in-out infinite;
+    border-radius: 6px;
+  }
+  @keyframes sk {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  /* ── Regime badges ───────────────────────────────────────────────── */
+  .regime-badge { @apply pill; }
+  .regime-sticky-delta  { @apply pill pill-green; }
+  .regime-sticky-strike { @apply pill pill-teal; }
+  .regime-local-vol     { @apply pill pill-yellow; }
+  .regime-jumpy         { @apply pill pill-red; }
+
+  /* ── Strategy banners ────────────────────────────────────────────── */
   .strategy-banner {
-    @apply px-4 py-2 rounded text-sm font-semibold text-center tracking-wider;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 700;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
   }
-  .banner-carry-on  { @apply strategy-banner bg-positive/20 text-positive border border-positive/30; }
-  .banner-carry-off { @apply strategy-banner bg-negative/20 text-negative border border-negative/30; }
+  .banner-carry-on  { background: rgba(63,185,80,0.12);  color: #3fb950; }
+  .banner-carry-off { background: rgba(248,81,73,0.12);  color: #f85149; }
+
+  /* ── Misc ────────────────────────────────────────────────────────── */
+  .conf-high   { color: #3fb950; }
+  .conf-medium { color: #e3b341; }
+  .conf-low    { color: #8b949e; }
+  .greek-short { color: #4dd0e1; }
+  .greek-long  { color: #5c9eff; }
+  .greek-warn  { color: #ffb74d; }
+  hr { border-color: #21262d; }
 }

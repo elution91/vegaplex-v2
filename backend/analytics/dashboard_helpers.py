@@ -10,11 +10,10 @@ import pandas as pd
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple, Any
 import logging
-import json
 
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from dash import html
+# dash import removed for FastAPI backend — html components replaced with plain dicts/None below
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +106,7 @@ _EC_LEGEND = {
     'textStyle': {'color': '#8b949e', 'fontSize': 11},
     'inactiveColor': '#4a5568',
     'top': 4,
-    'right': 8,
+    'left': 'center',
     'itemWidth': 12,
     'itemHeight': 4,
 }
@@ -133,45 +132,14 @@ _EC_AXIS_TIME = {**_EC_AXIS_BASE, 'type': 'time'}
 _EC_AXIS_Y = {**_EC_AXIS_BASE, 'type': 'value'}
 
 
-def _ec_iframe(option: dict, height: int = 300) -> html.Iframe:
-    """Wrap an ECharts option dict in a self-contained srcdoc iframe."""
-    # Inject watermark — scale down for short charts so it doesn't dominate
-    if 'graphic' not in option:
-        wm_w = 240 if height <= 260 else 300
-        wm_h = round(wm_w * 50 / 168)   # preserve 168:50 aspect ratio
-        wm = [{**_WATERMARK_GRAPHIC[0],
-               'style': {**_WATERMARK_GRAPHIC[0]['style'],
-                         'width': wm_w, 'height': wm_h}}]
-        option = {**option, 'graphic': wm}
-    option_json = json.dumps(option)
-    srcdoc = (
-        '<!DOCTYPE html><html><head><meta charset="utf-8">'
-        '<style>*{margin:0;padding:0;box-sizing:border-box;}'
-        'body{background:#0d1117;overflow:hidden;}'
-        '#c{width:100vw;height:100vh;}</style></head>'
-        '<body><div id="c"></div>'
-        '<script src="/assets/echarts.min.js"></script>'
-        '<script>var chart=echarts.init(document.getElementById("c"));'
-        f'chart.setOption({option_json});'
-        'window.addEventListener("resize",function(){chart.resize();});'
-        '</script></body></html>'
-    )
-    return html.Iframe(
-        srcDoc=srcdoc,
-        style={'width': '100%', 'height': f'{height}px', 'border': 'none', 'display': 'block'},
-    )
+def _ec_iframe(option: dict, height: int = 300) -> dict:
+    """In the FastAPI backend, return the raw ECharts option dict (no Iframe wrapper)."""
+    return option
 
 
-def _ec_empty(message: str = 'Run a scan to see data', height: int = 200):
-    """Return a plain dark placeholder (no iframe overhead)."""
-    return html.Div(
-        message,
-        style={
-            'height': f'{height}px', 'display': 'flex', 'alignItems': 'center',
-            'justifyContent': 'center', 'color': '#8b949e', 'fontSize': '13px',
-            'background': '#0d1117',
-        },
-    )
+def _ec_empty(message: str = 'Run a scan to see data', height: int = 200) -> dict:
+    """Return an empty dict placeholder (frontend renders its own empty state)."""
+    return {}
 
 
 def apply_dark_theme(fig: go.Figure, title: str = '',
@@ -522,17 +490,17 @@ def build_skew_charts(skew_data: Dict):
     call_c = [[round(e.get('tte', 0), 4), round(e.get('curvature', 0), 6)] for e in call_by_expiry]
     put_c  = [[round(e.get('tte', 0), 4), round(e.get('curvature', 0), 6)] for e in put_by_expiry]
 
-    return _two_series_chart(call_s, put_s, 'Slope'), html.Div(), _two_series_chart(call_c, put_c, 'Curvature')
+    return _two_series_chart(call_s, put_s, 'Slope'), {}, _two_series_chart(call_c, put_c, 'Curvature')
 
 
-def build_iron_fly_payoff_echarts(iron_fly: dict, spot: float) -> html.Iframe:
+def build_iron_fly_payoff_echarts(iron_fly: dict, spot: float) -> dict:
     """Return an html.Iframe containing a self-contained ECharts P&L diagram.
 
     Uses srcdoc so the chart is fully embedded — no clientside callback, no
     CDN timing issues. ECharts is loaded from /assets/echarts.min.js.
     """
     if not iron_fly or 'error' in iron_fly:
-        return html.Div("No iron fly data", style={'color': '#8b949e', 'padding': '12px'})
+        return {}
 
     k_sp = iron_fly.get('short_put_strike', spot)
     k_sc = iron_fly.get('short_call_strike', spot)
@@ -650,47 +618,7 @@ def build_iron_fly_payoff_echarts(iron_fly: dict, spot: float) -> html.Iframe:
         ],
     }
 
-    option_json = json.dumps(option)
-    srcdoc = f"""<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<style>
-  * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-  body {{ background: #0d1117; overflow: hidden; }}
-  #c {{ width: 100vw; height: 100vh; }}
-</style>
-</head>
-<body>
-<div id="c"></div>
-<script src="/assets/echarts.min.js"></script>
-<script>
-  var chart = echarts.init(document.getElementById('c'));
-  var opt = {option_json};
-  opt.tooltip.formatter = function(params) {{
-    var p = null;
-    for (var i = params.length - 1; i >= 0; i--) {{
-      if (params[i] && params[i].value) {{ p = params[i]; break; }}
-    }}
-    if (!p) return '';
-    var v = p.value[1];
-    return '$' + p.value[0].toFixed(2) + ' \u2192 ' + (v >= 0 ? '+' : '') + v.toFixed(3);
-  }};
-  chart.setOption(opt);
-  window.addEventListener('resize', function() {{ chart.resize(); }});
-</script>
-</body>
-</html>"""
-
-    return html.Iframe(
-        srcDoc=srcdoc,
-        style={
-            'width': '100%',
-            'height': '290px',
-            'border': 'none',
-            'display': 'block',
-        },
-    )
+    return option
 
 
 def build_iron_fly_payoff(iron_fly: dict, spot: float) -> go.Figure:
@@ -1263,17 +1191,31 @@ def build_regime_spot_vol_figure(regime_data: Dict):
     scatter_data = [[round(float(r), 6), round(float(v), 6)] for r, v in zip(ret_aligned, vol_changes)]
     ts_data = [[str(d)[:10], round(float(v), 6)] for d, v in zip(dates, vol)]
 
+    # OLS regression line on scatter
+    import numpy as np  # noqa: PLC0415
+    xs = np.array([float(r) for r in ret_aligned])
+    ys = np.array([float(v) for v in vol_changes])
+    mask = np.isfinite(xs) & np.isfinite(ys)
+    xs, ys = xs[mask], ys[mask]
+    slope, intercept = (np.polyfit(xs, ys, 1) if len(xs) >= 10 else (0.0, 0.0))
+    r2 = float(np.corrcoef(xs, ys)[0, 1] ** 2) if len(xs) >= 10 else 0.0
+    x0, x1 = float(xs.min()), float(xs.max())
+    reg_data = [[round(x0, 6), round(float(slope * x0 + intercept), 6)],
+                [round(x1, 6), round(float(slope * x1 + intercept), 6)]]
+
     sym = regime_data.get('symbol', '')
     return _ec_iframe({
         'backgroundColor': '#0d1117', 'animation': False,
-        'title': {**_EC_TITLE, 'text': f'Spot–Vol Dynamics — {sym}'},
+        'title': {**_EC_TITLE, 'text': f'Spot–Vol Dynamics — {sym}',
+                  'subtext': f'vol β = {slope:.2f}   R² = {r2:.2f}',
+                  'subtextStyle': {'color': '#8b949e', 'fontSize': 10}},
         'tooltip': {**_EC_TOOLTIP, 'trigger': 'item',
                     'formatter': "function(p){return 'Return: <b>'+p.value[0].toFixed(4)+"
                                  "'</b><br>ΔVol: <b>'+p.value[1].toFixed(4)+'</b>';}"},
-        'legend': {**_EC_LEGEND, 'data': ['Scatter', 'Realised Vol']},
+        'legend': {**_EC_LEGEND, 'data': ['Scatter', 'Vol β', 'Realised Vol']},
         'grid': [
-            {'left': '6%', 'right': '54%', 'top': '18%', 'bottom': '14%'},
-            {'left': '52%', 'right': '4%',  'top': '18%', 'bottom': '14%'},
+            {'left': '6%', 'right': '54%', 'top': '22%', 'bottom': '14%'},
+            {'left': '52%', 'right': '4%',  'top': '22%', 'bottom': '14%'},
         ],
         'xAxis': [
             {**_EC_AXIS_X, 'gridIndex': 0, 'name': 'Spot Return', 'nameLocation': 'middle', 'nameGap': 28},
@@ -1286,7 +1228,11 @@ def build_regime_spot_vol_figure(regime_data: Dict):
         'series': [
             {'type': 'scatter', 'name': 'Scatter', 'xAxisIndex': 0, 'yAxisIndex': 0,
              'data': scatter_data, 'symbolSize': 5,
-             'itemStyle': {'color': '#00d4aa', 'opacity': 0.6}},
+             'itemStyle': {'color': '#00d4aa', 'opacity': 0.5}},
+            {'type': 'line', 'name': 'Vol β', 'xAxisIndex': 0, 'yAxisIndex': 0,
+             'data': reg_data, 'symbol': 'none',
+             'lineStyle': {'color': '#f85149', 'width': 1.5, 'type': 'dashed'},
+             'tooltip': {'show': False}},
             {'type': 'line', 'name': 'Realised Vol', 'xAxisIndex': 1, 'yAxisIndex': 1,
              'symbol': 'none', 'data': ts_data,
              'lineStyle': {'color': '#ffa15a', 'width': 2}},
@@ -1306,7 +1252,6 @@ def build_regime_correlation_figure(regime_data: Dict):
     sym = regime_data.get('symbol', '')
     return _ec_iframe({
         'backgroundColor': '#0d1117', 'animation': False,
-        'title': {**_EC_TITLE, 'text': f'Spot–Vol Correlation Windows — {sym}'},
         'grid': _EC_GRID,
         'tooltip': {**_EC_TOOLTIP, 'trigger': 'item',
                     'formatter': "function(p){return p.name+' window: <b>'+p.value.toFixed(3)+'</b>';}"},
@@ -1335,7 +1280,6 @@ def build_regime_sqrt_t_figure(regime_data: Dict):
     sym = regime_data.get('symbol', '')
     return _ec_iframe({
         'backgroundColor': '#0d1117', 'animation': False,
-        'title': {**_EC_TITLE, 'text': f'√T Skew Normalisation — {sym}'},
         'grid': _EC_GRID,
         'tooltip': {**_EC_TOOLTIP,
                     'formatter': "function(params){if(!Array.isArray(params))params=[params];"
@@ -1546,48 +1490,85 @@ def build_vix_ratio_history_figure(df: pd.DataFrame, metrics: dict):
     }, 320)
 
 
-def build_vix_term_structure_figure(futures_strip: list, vix_spot: float, vix3m: float):
+def build_vix_term_structure_figure(futures_strip: list, vix_spot: float, vix3m: float, strip_source: str = "prev_settlement"):
     """VIX term structure: spot + futures strip with M1/M2/M3 labels."""
+    title = 'VIX Futures Term Structure'
+    if strip_source == "prev_settlement":
+        title += '  (prev settlement)'
     if futures_strip:
         def _lbl(i, c):
             return f'M{i+1} {c["label"]}' if i < 3 else c['label']
         labels = ['Spot'] + [_lbl(i, c) for i, c in enumerate(futures_strip)]
         levels = [vix_spot] + [c['level'] for c in futures_strip]
-        dtes   = [0] + [c['dte'] for c in futures_strip]
         colors = [_C['text']] + [
             _C['positive'] if levels[i] >= levels[i-1] else _C['negative']
             for i in range(1, len(levels))
         ]
     else:
         vix_2m = vix_spot + (vix3m - vix_spot) * (60 / 93)
-        dtes   = [0, 30, 60, 93]
         levels = [vix_spot, vix_spot, vix_2m, vix3m]
         labels = ['Spot', 'VIX 1M', 'VIX 2M', 'VIX3M']
         colors = [_C['text'], _C['blue'], _C['accent'], _C['accent']]
 
-    scatter_data = [{'value': [dtes[i], round(float(levels[i]), 4)],
-                     'symbol': 'circle', 'symbolSize': 9,
-                     'itemStyle': {'color': colors[i]},
-                     'label': {'show': True, 'formatter': labels[i],
-                               'position': 'top', 'color': '#8b949e', 'fontSize': 9}}
-                    for i in range(len(dtes))]
-    # Auto-range y-axis so a shallow contango is visually apparent (not squashed to 0-baseline)
-    _lmin = min(float(v) for v in levels)
+    # Shorten labels: strip year from non-spot entries for a cleaner axis
+    short_labels = []
+    for lbl in labels:
+        # e.g. 'M1 Apr 2026' -> 'Apr', 'May 2026' -> 'May', 'Spot' -> 'Spot'
+        parts = lbl.split()
+        if parts[0] == 'Spot':
+            short_labels.append('Spot')
+        elif parts[0].startswith('M') and len(parts) >= 3:
+            short_labels.append(parts[1])   # month name only
+        elif len(parts) >= 2:
+            short_labels.append(parts[0])   # month name only
+        else:
+            short_labels.append(lbl)
+
+    spot_val = round(float(levels[0]), 3)
+    futures_labels = short_labels[1:]
+    futures_levels = [round(float(v), 3) for v in levels[1:]]
+    futures_dtes   = [c['dte'] for c in futures_strip] if futures_strip else [30, 60, 93]
+    futures_colors = colors[1:]
+
     _lmax = max(float(v) for v in levels)
-    _pad  = max(0.5, (_lmax - _lmin) * 0.5)
+    _pad  = max(0.5, _lmax * 0.08)
+
+    # JS lookup: {dte: monthName} for axis tick formatter
+    dte_map = {str(futures_dtes[i]): futures_labels[i] for i in range(len(futures_dtes))}
+    dte_map_js = str(dte_map).replace("'", '"')
+    dte_to_month_js = f"var m={dte_map_js};if(m[String(Math.round(v))])return m[String(Math.round(v))];"
+
+    # Build scatter with month name labels on each dot
+    scatter_data = [{'value': [futures_dtes[i], futures_levels[i]],
+                     'symbol': 'circle', 'symbolSize': 8,
+                     'itemStyle': {'color': futures_colors[i]},
+                     'label': {'show': True, 'formatter': str(futures_levels[i]),
+                               'position': 'top', 'color': '#8b949e', 'fontSize': 9}}
+                    for i in range(len(futures_dtes))]
+
     return _ec_iframe({
         'backgroundColor': '#0d1117', 'animation': False,
-        'title': {**_EC_TITLE, 'text': 'VIX Futures Term Structure'},
+        'title': {**_EC_TITLE, 'text': title},
         'grid': _EC_GRID,
-        'tooltip': {**_EC_TOOLTIP, 'trigger': 'item'},
-        'xAxis': {**_EC_AXIS_X, 'name': 'Days to expiry', 'nameLocation': 'middle', 'nameGap': 28},
+        'tooltip': {**_EC_TOOLTIP, 'trigger': 'item',
+                    'formatter': "function(p){return p.name+'<br/>VIX: <b>'+p.value[1]+'</b>'}"},
+        'xAxis': {**_EC_AXIS_X, 'name': 'Contract Month', 'nameLocation': 'middle', 'nameGap': 28,
+                  'axisLabel': {'color': '#8b949e', 'fontSize': 10,
+                                'formatter': f"function(v){{{dte_to_month_js}return v;}}"}},
         'yAxis': {**_EC_AXIS_Y, 'name': 'VIX level', 'nameLocation': 'middle', 'nameGap': 36,
-                  'min': round(_lmin - _pad, 1), 'max': round(_lmax + _pad, 1)},
+                  'min': 6, 'max': round(_lmax + _pad, 1)},
         'series': [
-            {'type': 'line', 'data': [[dtes[i], round(float(levels[i]), 4)] for i in range(len(dtes))],
-             'symbol': 'none', 'lineStyle': {'color': '#00d4aa', 'width': 2},
-             'z': 1},
-            {'type': 'scatter', 'data': scatter_data, 'z': 2},
+            {'type': 'line', 'name': 'Futures',
+             'data': [[futures_dtes[i], futures_levels[i]] for i in range(len(futures_dtes))],
+             'symbol': 'none', 'lineStyle': {'color': '#00d4aa', 'width': 2}, 'z': 1},
+            {'type': 'scatter', 'name': 'Futures', 'data': scatter_data, 'z': 2},
+            # Spot — yellow diamond at DTE=0
+            {'type': 'scatter', 'name': 'Spot', 'z': 3,
+             'data': [{'value': [0, spot_val], 'symbol': 'diamond', 'symbolSize': 12,
+                       'itemStyle': {'color': '#e3b341'},
+                       'label': {'show': True, 'formatter': f'Spot\n{spot_val}',
+                                 'position': 'right', 'color': '#e3b341',
+                                 'fontSize': 10, 'fontWeight': 600}}]},
         ],
     }, 290)
 
@@ -1653,15 +1634,13 @@ def build_vix_outcomes_figure(outcomes: dict):
         return _ec_empty('No outcome data', 380)
 
     labels, medians, p25s, p75s, spike_pcts, ns = [], [], [], [], [], []
-    for label in ['< 0.35', '0.35–0.50', '0.50–0.75', '0.75–1.00', '> 1.00']:
-        o = {}
-        for key in [label, f'{label}  (off)', f'{label}  (rich)', label]:
-            o = outcomes.get(key, o)
-            if o.get('n', 0) > 0:
-                break
+    # Iterate in the order the engine produces them (CARRY_BUCKETS in vix_futures_engine.py)
+    for key, o in outcomes.items():
         if not o or not o.get('n'):
             continue
-        labels.append(label)
+        if o.get('median') is None:
+            continue
+        labels.append(key)
         medians.append(round(float(o['median']), 4))
         p25s.append(round(float(o['p25']), 4))
         p75s.append(round(float(o['p75']), 4))
@@ -1683,8 +1662,8 @@ def build_vix_outcomes_figure(outcomes: dict):
         'tooltip': _EC_TOOLTIP,
         'legend': {**_EC_LEGEND, 'left': 'center'},
         'grid': [
-            {'left': 52, 'right': 20, 'top': '18%', 'height': '48%', 'containLabel': True},
-            {'left': 52, 'right': 20, 'top': '72%', 'height': '22%', 'containLabel': True},
+            {'left': 52, 'right': 20, 'top': '14%', 'height': '48%', 'containLabel': True},
+            {'left': 52, 'right': 20, 'top': '76%', 'height': '20%', 'containLabel': True},
         ],
         'xAxis': [
             {**_EC_AXIS_CAT, 'gridIndex': 0, 'data': labels, 'axisLabel': {'show': False}},
@@ -1692,8 +1671,11 @@ def build_vix_outcomes_figure(outcomes: dict):
              'axisLabel': {'color': '#8b949e', 'fontSize': 9, 'rotate': 20}},
         ],
         'yAxis': [
-            {**_EC_AXIS_Y, 'gridIndex': 0, 'name': 'SVXY 21d ret (%)', 'nameLocation': 'middle', 'nameGap': 42},
-            {**_EC_AXIS_Y, 'gridIndex': 1, 'name': 'Spike %', 'nameLocation': 'middle', 'nameGap': 36},
+            {**_EC_AXIS_Y, 'gridIndex': 0, 'name': 'SVXY 21d ret (%)',
+             'nameLocation': 'middle', 'nameGap': 42, 'splitNumber': 4},
+            {**_EC_AXIS_Y, 'gridIndex': 1, 'name': 'Spike %',
+             'nameLocation': 'middle', 'nameGap': 36, 'splitNumber': 2,
+             'min': 0, 'axisLabel': {'color': '#8b949e', 'fontSize': 9}},
         ],
         'series': [
             {'type': 'bar', 'name': 'Median return', 'xAxisIndex': 0, 'yAxisIndex': 0,
@@ -1883,3 +1865,141 @@ def build_vix_vrp_figure(df: pd.DataFrame, percentiles: dict):
         'yAxis': y_axes,
         'series': series,
     }, 260)
+
+
+def build_skew_dynamics_charts(skew_ctx: Dict) -> Dict:
+    """
+    Build ECharts option dicts from skew_history.get_context() output.
+    skew_ctx keys: call_slope, put_slope, call_atm_vol, put_atm_vol,
+                   term_steepness, fwd_vol_near, fwd_vol_far, rv_5d, rv_10d, rv_21d, ...
+    Each value: {current, percentile, mean, std, min, max, z_score, n_obs}
+    Returns dict of chart_key -> ECharts option dict (rendered by frontend ChartCard).
+    """
+
+    def _val(m: str):
+        ctx = skew_ctx.get(m)
+        return ctx['current'] if ctx else None
+
+    def _pct(m: str):
+        ctx = skew_ctx.get(m)
+        return ctx['percentile'] if ctx else None
+
+    def _mean(m: str):
+        ctx = skew_ctx.get(m)
+        return ctx['mean'] if ctx else None
+
+    def _bar_color(pct) -> str:
+        if pct is None:
+            return '#8b949e'
+        if pct > 75:
+            return '#f85149'
+        if pct > 50:
+            return '#e3b341'
+        return '#3fb950'
+
+    charts: Dict = {}
+
+    # ── 1. ATM IV: call vs put ─────────────────────────────────────────
+    call_iv = _val('call_atm_vol')
+    put_iv  = _val('put_atm_vol')
+    if call_iv is not None or put_iv is not None:
+        cats  = ['Call ATM IV', 'Put ATM IV']
+        vals  = [round((call_iv or 0) * 100, 2), round((put_iv or 0) * 100, 2)]
+        means = [round((_mean('call_atm_vol') or 0) * 100, 2),
+                 round((_mean('put_atm_vol')  or 0) * 100, 2)]
+        pcts  = [_pct('call_atm_vol'), _pct('put_atm_vol')]
+        charts['atm_iv'] = _ec_iframe({
+            'backgroundColor': '#0d1117', 'animation': False,
+            'title': {**_EC_TITLE, 'text': 'ATM Implied Vol  \u00b7  Call vs Put'},
+            'grid': _EC_GRID,
+            'tooltip': {**_EC_TOOLTIP, 'trigger': 'axis'},
+            'legend': {**_EC_LEGEND, 'data': ['Current', 'Hist. Mean']},
+            'xAxis': {**_EC_AXIS_X, 'type': 'category', 'data': cats},
+            'yAxis': {**_EC_AXIS_Y, 'name': 'IV (%)'},
+            'series': [
+                {'type': 'bar', 'name': 'Current', 'barMaxWidth': 48,
+                 'data': [{'value': v, 'itemStyle': {'color': _bar_color(p)}}
+                          for v, p in zip(vals, pcts)]},
+                {'type': 'bar', 'name': 'Hist. Mean', 'barMaxWidth': 48,
+                 'data': means,
+                 'itemStyle': {'color': 'rgba(139,148,158,0.35)'}},
+            ],
+        }, 280)
+
+    # ── 2. Skew slopes: call vs put ────────────────────────────────────
+    call_sl = _val('call_slope')
+    put_sl  = _val('put_slope')
+    if call_sl is not None or put_sl is not None:
+        cats  = ['Call Slope', 'Put Slope']
+        vals  = [round(call_sl or 0, 5), round(put_sl or 0, 5)]
+        means = [round(_mean('call_slope') or 0, 5), round(_mean('put_slope') or 0, 5)]
+        pcts  = [_pct('call_slope'), _pct('put_slope')]
+        charts['skew_slopes'] = _ec_iframe({
+            'backgroundColor': '#0d1117', 'animation': False,
+            'title': {**_EC_TITLE, 'text': 'Skew Slope  \u00b7  Call vs Put'},
+            'grid': _EC_GRID,
+            'tooltip': {**_EC_TOOLTIP, 'trigger': 'axis'},
+            'legend': {**_EC_LEGEND, 'data': ['Current', 'Hist. Mean']},
+            'xAxis': {**_EC_AXIS_X, 'type': 'category', 'data': cats},
+            'yAxis': {**_EC_AXIS_Y, 'name': 'Slope'},
+            'series': [
+                {'type': 'bar', 'name': 'Current', 'barMaxWidth': 48,
+                 'data': [{'value': v, 'itemStyle': {'color': _bar_color(p)}}
+                          for v, p in zip(vals, pcts)]},
+                {'type': 'bar', 'name': 'Hist. Mean', 'barMaxWidth': 48,
+                 'data': means,
+                 'itemStyle': {'color': 'rgba(139,148,158,0.35)'}},
+            ],
+        }, 280)
+
+    # ── 3. Term steepness + forward vol ────────────────────────────────
+    ts  = _val('term_steepness')
+    fvn = _val('fwd_vol_near')
+    fvf = _val('fwd_vol_far')
+    if any(v is not None for v in [ts, fvn, fvf]):
+        cats = ['Term Steepness', 'Fwd Vol Near', 'Fwd Vol Far']
+        vals = [round(ts or 0, 4),
+                round((fvn or 0) * 100, 2),
+                round((fvf or 0) * 100, 2)]
+        pcts = [_pct('term_steepness'), _pct('fwd_vol_near'), _pct('fwd_vol_far')]
+        inversion = (fvn is not None and fvf is not None and fvn > fvf)
+        title_text = 'Term Structure' + ('  \u26a0 Inverted' if inversion else '')
+        title_color = '#f85149' if inversion else '#e6edf3'
+        charts['term_structure'] = _ec_iframe({
+            'backgroundColor': '#0d1117', 'animation': False,
+            'title': {'text': title_text, 'left': 8, 'top': 6,
+                      'textStyle': {'color': title_color, 'fontSize': 12, 'fontWeight': 500}},
+            'grid': _EC_GRID,
+            'tooltip': {**_EC_TOOLTIP, 'trigger': 'axis'},
+            'xAxis': {**_EC_AXIS_X, 'type': 'category', 'data': cats},
+            'yAxis': {**_EC_AXIS_Y, 'name': 'Value'},
+            'series': [
+                {'type': 'bar', 'name': 'Value', 'barMaxWidth': 48,
+                 'data': [{'value': v, 'itemStyle': {'color': _bar_color(p)}}
+                          for v, p in zip(vals, pcts)]},
+            ],
+        }, 280)
+
+    # ── 4. Realised vol multi-horizon ──────────────────────────────────
+    rv5  = _val('rv_5d')
+    rv10 = _val('rv_10d')
+    rv21 = _val('rv_21d')
+    if any(v is not None for v in [rv5, rv10, rv21]):
+        cats = ['RV 5d', 'RV 10d', 'RV 21d']
+        vals = [round((v or 0) * 100, 2) for v in [rv5, rv10, rv21]]
+        pcts = [_pct('rv_5d'), _pct('rv_10d'), _pct('rv_21d')]
+        charts['realised_vol'] = _ec_iframe({
+            'backgroundColor': '#0d1117', 'animation': False,
+            'title': {**_EC_TITLE, 'text': 'Realised Vol  \u00b7  Multi-Horizon'},
+            'grid': _EC_GRID,
+            'tooltip': {**_EC_TOOLTIP, 'trigger': 'axis'},
+            'xAxis': {**_EC_AXIS_X, 'type': 'category', 'data': cats},
+            'yAxis': {**_EC_AXIS_Y, 'name': 'RV (%)'},
+            'series': [
+                {'type': 'bar', 'name': 'Realised Vol', 'barMaxWidth': 48,
+                 'data': [{'value': v, 'itemStyle': {'color': _bar_color(p)}}
+                          for v, p in zip(vals, pcts)]},
+            ],
+        }, 280)
+
+    return charts

@@ -51,7 +51,11 @@ except ImportError:
     _SKLEARN = False
     logger.warning("scikit-learn not installed — VIX PCA disabled")
 
-DB_PATH      = Path(__file__).parent / 'skew_history.db'
+import os  # noqa: E402
+_DATA_DIR = os.environ.get('VEGAPLEX_DATA_DIR')
+DB_PATH = (Path(_DATA_DIR) / 'skew_history.db'
+           if _DATA_DIR
+           else Path(__file__).parent / 'skew_history.db')
 MIN_FIT_DAYS = 60   # minimum strip observations needed before PCA is meaningful
 N_CONTRACTS  = 8    # M1 … M8
 

@@ -1,40 +1,94 @@
 import { useScanStore, Opportunity } from '../store/useScanStore'
+import { useSettingsStore } from '../store/useSettingsStore'
+import Tooltip from '../components/shared/Tooltip'
 import ProgressStream from '../components/shared/ProgressStream'
 import ChartCard from '../components/charts/ChartCard'
 import EmptyState from '../components/shared/EmptyState'
 import MetricCard from '../components/shared/MetricCard'
-import clsx from 'clsx'
 
-function confidenceClass(conf: number) {
-  if (conf >= 0.7) return 'conf-high'
-  if (conf >= 0.45) return 'conf-medium'
-  return 'conf-low'
+// ── Conditional formatting — thresholds injected at render time ────────────
+
+function confStyle(conf: number, high: number, med: number) {
+  if (conf >= high) return { color: '#3fb950', background: 'rgba(63,185,80,0.12)', fontWeight: 600 }
+  if (conf >= med)  return { color: '#FACC15', background: 'rgba(250,204,21,0.10)' }
+  return { color: '#6e7681' }
 }
 
-function greekClass(bias: string | undefined, aligned: string | undefined) {
-  if (aligned === 'False') return 'greek-warn'
-  if (bias === 'short') return 'greek-short'
-  if (bias === 'long') return 'greek-long'
-  return ''
+function rrStyle(rr: number, excellent: number, acceptable: number) {
+  if (rr >= excellent)  return { color: '#3fb950', background: 'rgba(63,185,80,0.12)', fontWeight: 600 }
+  if (rr >= acceptable) return { color: '#FACC15', background: 'rgba(250,204,21,0.10)' }
+  return { color: '#6e7681' }
 }
+
+function greekStyle(bias: string | undefined, aligned: string | undefined) {
+  if (aligned === 'False') return { color: '#d29922', fontWeight: 600 }
+  if (bias === 'short')    return { color: '#00d4aa' }
+  if (bias === 'long')     return { color: '#58a6ff' }
+  return { color: '#8b949e' }
+}
+
+function legStyle(action: string) {
+  return action === 'BUY'
+    ? { color: '#3fb950' }
+    : { color: '#f85149' }
+}
+
+function richStyle(rich: number | undefined) {
+  if (rich == null) return {}
+  if (rich > 0.05)  return { color: '#3fb950' }
+  if (rich < -0.05) return { color: '#f85149' }
+  return {}
+}
+
+function fmt(v: unknown, decimals = 2): string {
+  if (v == null) return '—'
+  const n = Number(v)
+  return isNaN(n) ? String(v) : n.toFixed(decimals)
+}
+
+// ── Column definitions ─────────────────────────────────────────────────────
+
+const COLS = [
+  { key: 'symbol',     label: 'Symbol',     tip: '' },
+  { key: 'type',       label: 'Type',       tip: '' },
+  { key: 'subtype',    label: 'Subtype',    tip: '' },
+  { key: 'confidence', label: 'Confidence', tip: 'Model confidence score (0–100%). ≥70% = high (green), ≥50% = medium (yellow).' },
+  { key: 'max_gain',   label: 'Max Gain',   tip: 'Maximum profit at expiry.' },
+  { key: 'max_loss',   label: 'Max Loss',   tip: 'Maximum loss at expiry (worst case).' },
+  { key: 'rr',         label: 'R/R',        tip: 'Risk/reward ratio: Max Gain ÷ Max Loss. ≥3 = excellent, ≥1.5 = acceptable.' },
+  { key: 'greeks',     label: 'Greeks',     tip: 'Net Greek exposure. Teal = short vega, blue = long vega, amber = misaligned.' },
+  { key: 'regime',     label: 'Regime',     tip: 'Vol regime: Sticky Delta, Sticky Strike, Local Vol, or Jumpy.' },
+  { key: 'rationale',  label: 'Rationale',  tip: '' },
+]
+
+const LEG_COLS = [
+  { key: 'action', label: 'Action' },
+  { key: 'type',   label: 'Type' },
+  { key: 'strike', label: 'Strike' },
+  { key: 'expiry', label: 'Expiry' },
+  { key: 'qty',    label: 'Qty' },
+  { key: 'price',  label: 'Price' },
+  { key: 'delta',  label: 'Delta' },
+  { key: 'vega',   label: 'Vega' },
+  { key: 'theta',  label: 'Theta' },
+  { key: 'iv',     label: 'IV' },
+  { key: 'rich',   label: 'Rich' },
+]
+
+// ── Main view ──────────────────────────────────────────────────────────────
 
 export default function ResultsView() {
   const { status, progress, results, errors, selectedOpportunity, selectOpportunity } = useScanStore()
-
-  // Flatten all opportunities across all scan rows
+  const t = useSettingsStore((s) => s.thresholds)
   const allOpps: Opportunity[] = results.flatMap((r) => r.opportunities ?? [])
 
   const totalOpps = allOpps.length
-  const avgConf = totalOpps
-    ? (allOpps.reduce((s, o) => s + (o.confidence ?? 0), 0) / totalOpps).toFixed(2)
-    : '—'
-  const avgRR = totalOpps
-    ? (allOpps.reduce((s, o) => s + (o.rr ?? 0), 0) / totalOpps).toFixed(2)
-    : '—'
+  const avgConf   = totalOpps ? (allOpps.reduce((s, o) => s + (o.confidence ?? 0), 0) / totalOpps).toFixed(2) : '—'
+  const avgRR     = totalOpps ? (allOpps.reduce((s, o) => s + (o.rr ?? 0), 0) / totalOpps).toFixed(2) : '—'
+  const highConf  = allOpps.filter((o) => (o.confidence ?? 0) >= t.confidence_high).length
 
   return (
-    <div className="space-y-4">
-      {/* Progress */}
+    <div className="space-y-2">
       <ProgressStream
         done={progress.done}
         total={progress.total}
@@ -43,11 +97,12 @@ export default function ResultsView() {
         visible={status === 'running'}
       />
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-3 gap-2">
-        <MetricCard label="Opportunities" value={totalOpps} />
-        <MetricCard label="Avg Confidence" value={avgConf} />
-        <MetricCard label="Avg R/R" value={avgRR} />
+      {/* Summary metric cards */}
+      <div className="grid grid-cols-4 gap-2">
+        <MetricCard label="Opportunities"   value={totalOpps || '—'} />
+        <MetricCard label="High Confidence" value={highConf  || '—'} />
+        <MetricCard label="Avg Confidence"  value={avgConf} />
+        <MetricCard label="Avg R/R"         value={avgRR} />
       </div>
 
       {totalOpps === 0 && status !== 'running' && (
@@ -55,44 +110,63 @@ export default function ResultsView() {
       )}
 
       {totalOpps > 0 && (
-        <div className="flex gap-4">
-          {/* Opportunities table */}
-          <div className="flex-1 card overflow-hidden">
+        <div className="space-y-2">
+          {/* Full-width opportunities table */}
+          <div className="card overflow-auto" style={{ maxHeight: selectedOpportunity ? 'calc(50vh - 60px)' : 'calc(100vh - 200px)' }}>
             <table className="vp-table">
               <thead>
                 <tr>
-                  <th>Symbol</th>
-                  <th>Type</th>
-                  <th>Confidence</th>
-                  <th>R/R</th>
-                  <th>Greeks</th>
+                  {COLS.map((c) => (
+                    <th key={c.key}>
+                      {c.tip ? <Tooltip text={c.tip} icon>{c.label}</Tooltip> : c.label}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
-                {allOpps.map((opp, i) => (
-                  <tr
-                    key={i}
-                    onClick={() => selectOpportunity(opp)}
-                    className={clsx('cursor-pointer', selectedOpportunity === opp && 'selected')}
-                  >
-                    <td className="text-accent">{opp.symbol}</td>
-                    <td>{opp.type}</td>
-                    <td className={confidenceClass(opp.confidence ?? 0)}>
-                      {opp.confidence != null ? (opp.confidence * 100).toFixed(0) + '%' : '—'}
-                    </td>
-                    <td>{opp.rr != null ? opp.rr.toFixed(2) : '—'}</td>
-                    <td className={greekClass(opp._vega_bias, opp._greek_aligned)}>
-                      {opp.greeks ?? '—'}
-                    </td>
-                  </tr>
-                ))}
+                {allOpps.map((opp, i) => {
+                  const conf = opp.confidence ?? 0
+                  const rr   = opp.rr ?? 0
+                  const isSelected = selectedOpportunity === opp
+                  return (
+                    <tr
+                      key={i}
+                      onClick={() => selectOpportunity(isSelected ? null : opp)}
+                      className="cursor-pointer"
+                      style={isSelected ? { background: 'rgba(88,166,255,0.07)' } : undefined}
+                    >
+                      <td style={{ color: '#2DD4BF', fontWeight: 600 }}>{opp.symbol}</td>
+                      <td>{opp.type ?? '—'}</td>
+                      <td>{(opp.subtype as string) ?? '—'}</td>
+                      <td>
+                        <span style={{ ...confStyle(conf, t.confidence_high, t.confidence_med), padding: '1px 6px', borderRadius: 3 }}>
+                          {(conf * 100).toFixed(0)}%
+                        </span>
+                      </td>
+                      <td style={{ color: '#3fb950' }}>{fmt(opp.max_gain)}</td>
+                      <td style={{ color: '#f85149' }}>{fmt(opp.max_loss)}</td>
+                      <td>
+                        <span style={{ ...rrStyle(rr, t.rr_excellent, t.rr_acceptable), padding: '1px 6px', borderRadius: 3 }}>
+                          {rr.toFixed(2)}
+                        </span>
+                      </td>
+                      <td style={greekStyle(opp._vega_bias as string, opp._greek_aligned as string)}>
+                        {(opp.greeks as string) ?? '—'}
+                      </td>
+                      <td>{(opp.regime as string) ?? '—'}</td>
+                      <td style={{ color: '#8b949e', maxWidth: 280 }} className="truncate">
+                        {(opp.rationale as string) ?? '—'}
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
 
-          {/* Drill-down panel */}
+          {/* Drill-down — below the table, full width */}
           {selectedOpportunity && (
-            <DrillDown opp={selectedOpportunity} />
+            <DrillDown opp={selectedOpportunity} confHigh={t.confidence_high} confMed={t.confidence_med} rrExcellent={t.rr_excellent} rrAcceptable={t.rr_acceptable} />
           )}
         </div>
       )}
@@ -100,27 +174,126 @@ export default function ResultsView() {
   )
 }
 
-function DrillDown({ opp }: { opp: Opportunity }) {
+// ── Drill-down panel (full width, below table) ─────────────────────────────
+
+function DrillDown({ opp, confHigh, confMed, rrExcellent, rrAcceptable }: {
+  opp: Opportunity
+  confHigh: number
+  confMed: number
+  rrExcellent: number
+  rrAcceptable: number
+}) {
+  const payoff = opp.payoff_chart as Record<string, unknown> | undefined
+  const m      = opp.metrics     as Record<string, number>  | undefined
+
+  const conf = (opp.confidence ?? 0) as number
+
   return (
-    <div className="w-80 space-y-3 shrink-0">
-      <div className="card p-3 text-xs space-y-1">
-        <div className="font-semibold text-text-primary">{opp.symbol} — {opp.type}</div>
-        {opp.legs?.map((leg, i) => (
-          <div key={i} className="flex justify-between text-text-muted">
-            <span>{leg.action} {leg.type} ${leg.strike} {leg.expiry}</span>
-            <span>${leg.price?.toFixed(2)}</span>
-          </div>
-        ))}
+    <div className="card" style={{ padding: '14px 16px' }}>
+      {/* ── Header row ──────────────────────────────────────────────── */}
+      <div className="flex items-center gap-3 mb-3" style={{ borderBottom: '1px solid #21262d', paddingBottom: 10 }}>
+        <span style={{ color: '#2DD4BF', fontWeight: 700, fontSize: 14 }}>{opp.symbol}</span>
+        <span className="caption">
+          {opp.type}{opp.subtype ? ` / ${String(opp.subtype)}` : ''}
+        </span>
+        <span style={{ ...confStyle(conf, confHigh, confMed), padding: '1px 7px', borderRadius: 3, fontSize: 12 }}>
+          {(conf * 100).toFixed(0)}% conf
+        </span>
+        <span style={{ ...rrStyle((opp.rr ?? 0) as number, rrExcellent, rrAcceptable), padding: '1px 7px', borderRadius: 3, fontSize: 12 }}>
+          R/R {((opp.rr ?? 0) as number).toFixed(2)}
+        </span>
+        <span style={{ color: '#3fb950', fontSize: 13, fontWeight: 600, marginLeft: 8 }}>
+          Max: {fmt(opp.max_gain as number)}
+        </span>
+        <span style={{ color: '#f85149', fontSize: 13, fontWeight: 600 }}>
+          Loss: {fmt(opp.max_loss as number)}
+        </span>
       </div>
 
-      {/* Payoff chart — option dict comes from the backend when available */}
-      {(opp as Record<string, unknown>).payoff_chart && (
-        <ChartCard
-          title="Payoff"
-          option={(opp as Record<string, unknown>).payoff_chart as Record<string, unknown>}
-          height={220}
-        />
-      )}
+      {/* ── Content: 3-column grid ───────────────────────────────────── */}
+      <div className="grid grid-cols-3 gap-4">
+
+        {/* Col 1: Greeks + rationale */}
+        <div className="space-y-2">
+          {m && (
+            <div>
+              <div className="section-title mb-2">Greeks</div>
+              <div className="grid grid-cols-2 gap-1.5">
+                {[
+                  { label: 'Δ Delta', val: m.total_delta, dec: 3 },
+                  { label: 'ν Vega',  val: m.total_vega,  dec: 3 },
+                  { label: 'θ Theta', val: m.total_theta, dec: 3 },
+                  { label: 'γ Gamma', val: m.total_gamma, dec: 4 },
+                ].map(({ label, val, dec }) => (
+                  <div key={label} style={{ background: '#1c2128', borderRadius: 5, padding: '6px 10px' }}>
+                    <div className="caption">{label}</div>
+                    <div className="metric-value" style={{
+                      fontSize: 14,
+                      color: val == null ? '#6e7681' : val > 0 ? '#3fb950' : val < 0 ? '#f85149' : '#6e7681',
+                    }}>
+                      {val != null ? val.toFixed(dec) : '—'}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {opp.rationale != null && (
+            <div>
+              <div className="section-title mb-1">Rationale</div>
+              <p style={{ fontSize: 12, color: '#8b949e', lineHeight: 1.6, margin: 0 }}>
+                {String(opp.rationale)}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Col 2: Payoff chart */}
+        <div>
+          <div className="section-title mb-2">Payoff at Expiry</div>
+          {payoff
+            ? <ChartCard option={payoff} height={220} />
+            : <div className="skeleton" style={{ height: 220, borderRadius: 6 }} />
+          }
+        </div>
+
+        {/* Col 3: Legs table */}
+        <div>
+          <div className="section-title mb-2">Legs</div>
+          {opp.legs && opp.legs.length > 0 ? (
+            <div style={{ overflowX: 'auto' }}>
+              <table className="vp-table">
+                <thead>
+                  <tr>{LEG_COLS.map((c) => <th key={c.key}>{c.label}</th>)}</tr>
+                </thead>
+                <tbody>
+                  {opp.legs.map((leg, i) => {
+                    const r = leg as unknown as Record<string, unknown>
+                    return (
+                      <tr key={i}>
+                        <td style={legStyle(leg.action)}>{leg.action}</td>
+                        <td>{leg.type}</td>
+                        <td>${leg.strike}</td>
+                        <td>{leg.expiry}</td>
+                        <td>{(r.qty as number) ?? (r.contracts as number) ?? 1}</td>
+                        <td>${leg.price?.toFixed(2) ?? '—'}</td>
+                        <td>{fmt(r.delta, 3)}</td>
+                        <td>{fmt(r.vega, 3)}</td>
+                        <td>{fmt(r.theta, 3)}</td>
+                        <td>{fmt(r.iv as unknown, 3)}</td>
+                        <td style={richStyle(r.rich as number)}>{fmt(r.rich, 3)}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="caption">No legs data</p>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
