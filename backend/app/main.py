@@ -66,6 +66,7 @@ def create_app() -> FastAPI:
 
     # ── Routers ───────────────────────────────────────────────────────────────
     from app.routers import (  # noqa: PLC0415
+        admin,
         auth,
         broker,
         earnings,
@@ -79,6 +80,7 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(auth.router,      prefix="/api/auth",       tags=["auth"])
+    app.include_router(admin.router,     prefix="/api/admin",      tags=["admin"])
     app.include_router(scan.router,      prefix="/api/scan",       tags=["scan"])
     app.include_router(surface.router,   prefix="/api/surface",    tags=["surface"])
     app.include_router(regime.router,    prefix="/api/regime",     tags=["regime"])

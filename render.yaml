@@ -24,3 +24,8 @@ services:
         sync: false
       - key: VEGAPLEX_CORS_ORIGINS
         sync: false
+      # Massive S3 keys — used by the /api/admin/seed endpoint
+      - key: MASSIVE_ACCESS_KEY
+        sync: false
+      - key: MASSIVE_SECRET_KEY
+        sync: false
