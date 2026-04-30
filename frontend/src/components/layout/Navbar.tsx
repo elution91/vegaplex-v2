@@ -12,7 +12,7 @@ type NavGroup = { label: string; items: NavItem[] } | { label: string; path: str
 
 const NAV: NavGroup[] = [
   {
-    label: 'Universe',
+    label: 'LETF Universe',
     items: [
       { path: '/radar', label: 'Radar' },
     ],
