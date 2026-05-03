@@ -33,10 +33,10 @@ const NAV: NavGroup[] = [
     ],
   },
   {
-    label: 'Events',
+    label: 'Event IV',
     items: [
       { path: '/earnings/earnings', label: 'Earnings' },
-      { path: '/earnings/macro',    label: 'Macro Vol' },
+      { path: '/earnings/macro',    label: 'Macro Events' },
     ],
   },
   { label: 'Resources', path: '/resources' },
