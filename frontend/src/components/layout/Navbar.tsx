@@ -35,8 +35,10 @@ const NAV: NavGroup[] = [
   {
     label: 'Event IV',
     items: [
-      { path: '/earnings/earnings', label: 'Earnings' },
-      { path: '/earnings/macro',    label: 'Macro Events' },
+      // Earnings tab requires Chrome+Selenium — disabled in production until
+      // we move to a non-scraping data source. Local dev still has it via
+      // direct URL /earnings/earnings.
+      { path: '/earnings/macro', label: 'Economic Events' },
     ],
   },
   { label: 'Resources', path: '/resources' },

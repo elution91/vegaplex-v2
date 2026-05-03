@@ -1,9 +1,9 @@
+import { useNavigate } from 'react-router-dom'
 import { useScanStore, Opportunity } from '../store/useScanStore'
 import { useSettingsStore } from '../store/useSettingsStore'
 import Tooltip from '../components/shared/Tooltip'
 import ProgressStream from '../components/shared/ProgressStream'
 import ChartCard from '../components/charts/ChartCard'
-import EmptyState from '../components/shared/EmptyState'
 import MetricCard from '../components/shared/MetricCard'
 
 // ── Conditional formatting — thresholds injected at render time ────────────
@@ -78,9 +78,11 @@ const LEG_COLS = [
 // ── Main view ──────────────────────────────────────────────────────────────
 
 export default function ResultsView() {
+  const navigate = useNavigate()
   const { status, progress, results, errors, selectedOpportunity, selectOpportunity } = useScanStore()
   const t = useSettingsStore((s) => s.thresholds)
   const allOpps: Opportunity[] = results.flatMap((r) => r.opportunities ?? [])
+  const scannedSymbols = results.map((r) => r.symbol).filter(Boolean)
 
   const totalOpps = allOpps.length
   const avgConf   = totalOpps ? (allOpps.reduce((s, o) => s + (o.confidence ?? 0), 0) / totalOpps).toFixed(2) : '—'
@@ -106,7 +108,43 @@ export default function ResultsView() {
       </div>
 
       {totalOpps === 0 && status !== 'running' && (
-        <EmptyState message="Scan a symbol or universe to see results" />
+        status === 'complete' && scannedSymbols.length > 0 ? (
+          // Scan ran but found no qualifying opportunities — explain why.
+          <div className="card" style={{ padding: 20, lineHeight: 1.55 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: '#e6edf3', marginBottom: 6 }}>
+              No qualifying opportunities found for {scannedSymbols.slice(0, 5).join(', ')}
+              {scannedSymbols.length > 5 ? ` + ${scannedSymbols.length - 5} more` : ''}
+            </div>
+            <div style={{ fontSize: 12, color: '#8b949e', marginBottom: 12 }}>
+              The scanner is conservative by design. To clear the gate, an opportunity
+              must satisfy <em>all</em> of these:
+            </div>
+            <ul style={{ fontSize: 12, color: '#8b949e', paddingLeft: 18, marginBottom: 14, listStyle: 'disc' }}>
+              <li>Risk/reward ratio ≥ <strong style={{ color: '#e6edf3' }}>2.0</strong> — typical edge cases sit at 1.2–1.8</li>
+              <li>Strategy must match the active <strong style={{ color: '#e6edf3' }}>regime</strong> (e.g. long skew only emits in Jumpy Vol)</li>
+              <li>Positive expected P&amp;L and finite max loss</li>
+            </ul>
+            <div style={{ fontSize: 12, color: '#6e7681', marginBottom: 12 }}>
+              In quiet markets (low VIX, calm regimes) most tickers naturally produce zero hits.
+              This isn't a bug — it's the scanner saying "nothing edgy is priced today."
+            </div>
+            <button
+              onClick={() => navigate('/settings')}
+              style={{
+                fontSize: 12, padding: '5px 12px',
+                background: '#1f6feb', color: '#e6edf3',
+                border: 'none', borderRadius: 4, cursor: 'pointer',
+              }}
+            >
+              Adjust thresholds
+            </button>
+          </div>
+        ) : (
+          // Idle / no scan yet
+          <div className="card" style={{ padding: 20, color: '#8b949e', fontSize: 13 }}>
+            Scan a symbol via the navbar search, or click <strong>Scan Universe</strong> on the Radar page.
+          </div>
+        )
       )}
 
       {totalOpps > 0 && (
